@@ -1,0 +1,116 @@
+{
+  "name": "batch3-mount-catalog",
+  "description": "Batch 3 QA: LocalFS real filesystem, GitHubFS snapshot-based readonly, platform-catalog discovery pipeline.",
+  "tags": ["mount", "localfs", "githubfs", "catalog", "discovery", "batch3"],
+  "preflight": ["pnpm type-check", "pnpm test"],
+  "steps": [
+    {
+      "id": "localfs-sandbox",
+      "kind": "test",
+      "description": "LocalFS chroot sandbox and CRUD operations on real filesystem.",
+      "flow": [
+        "stat file → correct type and name",
+        "stat directory → type: directory",
+        "stat missing → NotFoundError",
+        "list root → entries match",
+        "list nested → correct entries",
+        "read → file content",
+        "write creates file and intermediate dirs",
+        "write overwrites existing",
+        "path traversal (../../) → PermissionDeniedError"
+      ],
+      "expect": "All real filesystem operations work within sandbox boundary."
+    },
+    {
+      "id": "githubfs-snapshot",
+      "kind": "test",
+      "description": "GitHubFS snapshot-based read operations.",
+      "flow": [
+        "loadSnapshot → stat returns file/directory/implicit-directory",
+        "list root → top-level entries",
+        "list nested → correct sub-entries",
+        "read → placeholder with repo reference",
+        "read directory → UnsupportedOperationError",
+        "write → UnsupportedOperationError (read-only)",
+        "refresh replaces snapshot entirely",
+        "basePath scopes to subdirectory"
+      ],
+      "expect": "All read operations work against snapshot. Write always rejected."
+    },
+    {
+      "id": "catalog-source-registry",
+      "kind": "test",
+      "description": "Catalog source registration, listing, and conflict detection.",
+      "flow": [
+        "register + list",
+        "duplicate id → ConflictError",
+        "unregister + size update",
+        "unregister missing → NotFoundError",
+        "describe with lifecycle phase"
+      ],
+      "expect": "Source registry manages sources with typed errors."
+    },
+    {
+      "id": "catalog-descriptor-store",
+      "kind": "test",
+      "description": "Descriptor CRUD and source-based operations.",
+      "flow": [
+        "set / get / delete",
+        "getBySource filters",
+        "deleteBySource removes all for source",
+        "list / size / clear"
+      ],
+      "expect": "Descriptor store provides path-keyed CRUD with source grouping."
+    },
+    {
+      "id": "catalog-hook-pipeline",
+      "kind": "test",
+      "description": "Filter and parser hook pipeline.",
+      "flow": [
+        "filters: all must pass (AND logic)",
+        "parsers: first match wins",
+        "parser error is non-fatal (skip to next)"
+      ],
+      "expect": "Pipeline correctly chains filters and parsers with error isolation."
+    },
+    {
+      "id": "catalog-scan-coordinator",
+      "kind": "test",
+      "description": "Full scan pipeline: source → filter → parse → store.",
+      "flow": [
+        "scan populates descriptor store",
+        "rescan clears old descriptors first",
+        "listEntries error → graceful failure with error count",
+        "filtered entries counted separately"
+      ],
+      "expect": "Scan coordinator orchestrates full pipeline with error resilience."
+    },
+    {
+      "id": "catalog-event-integration",
+      "kind": "test",
+      "description": "VFS event subscription lifecycle.",
+      "flow": [
+        "attach → subscription active",
+        "detach → unsubscribe called",
+        "re-attach → old subscription detached"
+      ],
+      "expect": "Event integration manages VFS subscription lifecycle."
+    },
+    {
+      "id": "import-boundary",
+      "kind": "test",
+      "description": "platform-catalog has no skill/prompt/context keywords in source.",
+      "flow": [
+        "grep platform-catalog/src for 'skill' → 0 matches",
+        "grep platform-catalog/src for 'prompt' → 0 matches",
+        "grep platform-catalog/src for 'daemon' → 0 matches"
+      ],
+      "expect": "Catalog is a generic platform layer with no business coupling."
+    }
+  ],
+  "artifacts": [
+    "packages/mountfs-host/src/__tests__/local-fs.test.ts",
+    "packages/mountfs-github/src/__tests__/github-fs.test.ts",
+    "packages/platform-catalog/src/__tests__/catalog.test.ts"
+  ]
+}

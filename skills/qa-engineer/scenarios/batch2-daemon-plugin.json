@@ -1,0 +1,123 @@
+{
+  "name": "batch2-daemon-plugin",
+  "description": "Batch 2 QA: daemon modular architecture (DI, command bus, lifecycle, state) + plugin sdk/support three-layer framework + Commander.js CLI.",
+  "tags": ["daemon", "plugin", "cli", "di", "lifecycle", "batch2"],
+  "preflight": [
+    "pnpm type-check",
+    "pnpm test"
+  ],
+  "steps": [
+    {
+      "id": "service-container-di",
+      "kind": "test",
+      "description": "Service container token registration, resolution, conflict, and optional dependency.",
+      "flow": [
+        "register(token, instance) → resolve(token) returns instance",
+        "duplicate register → ConflictError",
+        "resolve missing required → DependencyError",
+        "resolveOptional missing → undefined",
+        "has / size / clear semantics"
+      ],
+      "expect": "All DI operations follow typed token contract with stable error behavior."
+    },
+    {
+      "id": "command-bus",
+      "kind": "test",
+      "description": "Command registration, dispatch, conflict detection, and listing.",
+      "flow": [
+        "register + dispatch → handler called with args",
+        "duplicate register → ConflictError",
+        "dispatch missing → NotFoundError",
+        "list → all registered descriptors",
+        "async handler support"
+      ],
+      "expect": "Command bus correctly routes and rejects with typed errors."
+    },
+    {
+      "id": "state-store-lifecycle",
+      "kind": "test",
+      "description": "Daemon state transitions: idle → starting → active → stopping → stopped, plus failed and rolled_back.",
+      "flow": [
+        "Initial state: idle / phase: stopped",
+        "Transition through lifecycle states",
+        "Error recorded on failure transition",
+        "rolled_back maps to stopped phase",
+        "buildStatus produces correct DaemonStatus"
+      ],
+      "expect": "State store accurately tracks daemon lifecycle with observable phase mapping."
+    },
+    {
+      "id": "daemon-facade-compat",
+      "kind": "test",
+      "description": "DaemonHost preserves all existing public API after modularization.",
+      "flow": [
+        "start / stop / status / listPlugins / showPlugin / listCommands",
+        "listMountDescriptors / listVfs / readVfs / statVfs / watchVfs / streamVfs",
+        "Plugin setup and dispose order preserved",
+        "Rollback on startup failure preserved"
+      ],
+      "expect": "All 4 existing daemon tests pass unchanged. New modules don't break backward compat."
+    },
+    {
+      "id": "cli-commander",
+      "kind": "test",
+      "description": "CLI now routes through Commander.js with structured command groups.",
+      "flow": [
+        "daemon start / daemon stop via Commander",
+        "status returns JSON",
+        "plugin list / plugin show / command list",
+        "mount list / mount show",
+        "vfs list / vfs read / vfs stat / vfs watch / vfs stream",
+        "Unknown command → error"
+      ],
+      "expect": "All existing CLI tests pass. Commander.js routing is transparent to consumers."
+    },
+    {
+      "id": "plugin-sdk-modular",
+      "kind": "test",
+      "description": "Plugin SDK is now split into manifest/contribution/context/types modules.",
+      "flow": [
+        "validateManifest still works",
+        "PluginManifest now supports dependencies field",
+        "HookContribution type available",
+        "All existing plugin-sdk tests pass"
+      ],
+      "expect": "SDK layer is minimal and self-contained. No dependency on plugin-support."
+    },
+    {
+      "id": "plugin-support-layer",
+      "kind": "test",
+      "description": "New plugin-support package: registry, dependency graph, conflict detection, lifecycle.",
+      "flow": [
+        "PluginRegistryState registers capabilities/mounts/commands/hooks",
+        "Conflict detection on duplicates",
+        "checkDependencies: satisfied / missing / optional skip",
+        "assertDependencies: throws DependencyError",
+        "detectCommandConflicts / detectMountConflicts",
+        "PluginLifecycleManager: setup, dispose in reverse order"
+      ],
+      "expect": "Support layer provides all platform runtime utilities without SDK dependency."
+    },
+    {
+      "id": "import-boundary",
+      "kind": "test",
+      "description": "Three-layer import boundary: sdk does not import support; support imports sdk + shared; plugins import sdk + support.",
+      "flow": [
+        "grep plugin-sdk/src for 'plugin-support' → 0 matches",
+        "grep plugin-support/src for 'plugin-sdk' → allowed",
+        "grep plugin-support/src for 'daemon' → 0 matches"
+      ],
+      "expect": "Import boundaries are clean. No reverse dependencies."
+    }
+  ],
+  "artifacts": [
+    "packages/daemon/src/__tests__/service-container.test.ts",
+    "packages/daemon/src/__tests__/command-bus.test.ts",
+    "packages/daemon/src/__tests__/state-store.test.ts",
+    "packages/daemon/src/__tests__/daemon.test.ts",
+    "packages/cli/src/__tests__/cli.test.ts",
+    "packages/plugin-sdk/src/__tests__/plugin-sdk.test.ts",
+    "packages/plugin-support/src/__tests__/plugin-support.test.ts",
+    "packages/actant/src/__tests__/e2e-cli-workflow.test.ts"
+  ]
+}

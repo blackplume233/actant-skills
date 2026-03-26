@@ -1,0 +1,139 @@
+{
+  "name": "e2e-cli-workflow",
+  "description": "End-to-end CLI workflow scenarios: simulate real user configuration, daemon boot, VFS operations, plugin/command queries, error handling, and lifecycle management.",
+  "tags": ["e2e", "cli", "daemon", "vfs", "plugin", "lifecycle"],
+  "preflight": [
+    "pnpm type-check",
+    "pnpm test"
+  ],
+  "steps": [
+    {
+      "id": "boot-and-explore",
+      "kind": "test",
+      "description": "User boots the daemon with default config and explores the system through CLI.",
+      "entry": "packages/actant/src/__tests__/e2e-cli-workflow.test.ts",
+      "flow": [
+        "daemon start → returns 'daemon started'",
+        "status → JSON: started=true, state='active', mounts contains / and /workspace, plugins contains core.runtime",
+        "vfs list / → contains status.json",
+        "vfs read /status.json → valid JSON with ok:true",
+        "vfs list /workspace → contains README.md",
+        "vfs read /workspace/README.md → 'workspace'"
+      ],
+      "expect": "All CLI commands return correct structured output; daemon is fully operational after single boot command."
+    },
+    {
+      "id": "stat-descriptors",
+      "kind": "test",
+      "description": "User queries file and directory metadata through vfs stat.",
+      "entry": "packages/actant/src/__tests__/e2e-cli-workflow.test.ts",
+      "flow": [
+        "vfs stat /status.json → { path: '/status.json', name: 'status.json', type: 'regular' }",
+        "vfs stat /workspace → { path: '/workspace', name: 'workspace', type: 'directory' }"
+      ],
+      "expect": "stat returns correct path, name, and type for both files and mount-point directories. name is derived from VFS global path, not adapter-local root."
+    },
+    {
+      "id": "watch-stream-handles",
+      "kind": "test",
+      "description": "User requests watch/stream resource handles on VFS paths.",
+      "flow": [
+        "vfs watch /status.json → JSON with kind='watch', path='/status.json', released after release()",
+        "vfs stream /status.json → JSON with kind='stream', path='/status.json'"
+      ],
+      "expect": "Both handle types return structured metadata; release semantics are correct."
+    },
+    {
+      "id": "plugin-command-query",
+      "kind": "test",
+      "description": "User inspects registered plugins and contributed commands.",
+      "flow": [
+        "plugin list → 'core.runtime'",
+        "plugin show core.runtime → manifest with name and version",
+        "command list → array containing core.runtime.status with description"
+      ],
+      "expect": "Plugin introspection returns accurate manifest data; command contributions are discoverable."
+    },
+    {
+      "id": "error-propagation",
+      "kind": "test",
+      "description": "User enters invalid commands or accesses non-existent paths.",
+      "flow": [
+        "invalid command → throws 'Unknown command'",
+        "vfs delete /file → throws 'Unknown command' (no such CLI verb)",
+        "vfs read /nonexistent.txt → throws NotFoundError",
+        "vfs stat /missing/path → throws NotFoundError"
+      ],
+      "expect": "CLI surfaces clear, typed errors for unknown commands and VFS not-found. No silent failures or undefined behavior."
+    },
+    {
+      "id": "multi-plugin-mounts",
+      "kind": "test",
+      "description": "User configures multiple plugins, each contributing mount points and commands.",
+      "flow": [
+        "Configure 3 plugins: core.runtime, skills.provider (mount /skills), prompts.provider (mount /prompts)",
+        "daemon start",
+        "status → all 3 plugins listed, /skills and /prompts in mounts",
+        "vfs list /skills → greet.ts, summarize.ts",
+        "vfs read /skills/greet.ts → contains function body",
+        "vfs read /prompts/system.md → prompt text",
+        "vfs list /prompts/templates → chat.md",
+        "command list → includes skills.list and prompts.list",
+        "mount list → includes /skills, /prompts, /workspace"
+      ],
+      "expect": "Multiple plugins can register independent mount points; all contributed files, directories, and commands are accessible through standard CLI."
+    },
+    {
+      "id": "lifecycle-start-stop-restart",
+      "kind": "test",
+      "description": "User starts, operates, stops, and restarts the daemon.",
+      "flow": [
+        "daemon start → started=true",
+        "vfs read /status.json → ok",
+        "daemon stop → started=false, state='stopped'",
+        "daemon start (again) → started=true, VFS accessible",
+        "vfs read /status.json → ok (fresh state restored)"
+      ],
+      "expect": "State is fully cleaned on stop and fully restored on restart. No leaked mounts or stale data across cycles."
+    },
+    {
+      "id": "idempotent-start",
+      "kind": "test",
+      "description": "User accidentally starts the daemon twice.",
+      "flow": [
+        "daemon start → 'daemon started'",
+        "daemon start (duplicate) → 'daemon started' (no error)"
+      ],
+      "expect": "Double start is idempotent. No exception, no duplicate mounts, daemon remains operational."
+    },
+    {
+      "id": "plugin-setup-failure-rollback",
+      "kind": "test",
+      "description": "A faulty plugin throws during setup; user expects clean rollback.",
+      "flow": [
+        "Configure: core.runtime (ok) + bad.plugin (throws in setup)",
+        "daemon start → throws 'setup failed'",
+        "status → started=false, mounts=[]"
+      ],
+      "expect": "Plugin setup failure prevents daemon from entering started state. All previously registered mounts and plugins are rolled back. Core.runtime dispose is called."
+    },
+    {
+      "id": "vfs-event-bus-through-daemon",
+      "kind": "test",
+      "description": "Downstream consumer subscribes to VFS events through daemon kernel.",
+      "flow": [
+        "daemon start",
+        "Subscribe to kernel event bus",
+        "readVfs (read operation) → no event emitted",
+        "daemon stop"
+      ],
+      "expect": "Event bus is accessible on the daemon's kernel. Read-only operations do not emit events. Subscription lifecycle is clean."
+    }
+  ],
+  "artifacts": [
+    "packages/actant/src/__tests__/e2e-cli-workflow.test.ts",
+    "packages/cli/src/index.ts",
+    "packages/daemon/src/index.ts",
+    "packages/actant/src/index.ts"
+  ]
+}

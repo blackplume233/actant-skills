@@ -1,0 +1,61 @@
+{
+  "name": "e2e-milestone1-closeout",
+  "description": "Milestone 1 final closeout QA: 6 E2E scenarios, global import boundary, monolithic/stub cleanup verification.",
+  "tags": ["e2e", "milestone1", "closeout", "batch4"],
+  "preflight": ["pnpm type-check", "pnpm test"],
+  "steps": [
+    {
+      "id": "scenario-1-startup-status",
+      "kind": "test",
+      "description": "Daemon starts with runtime + LocalFS (real node:fs) + GitHubFS mounts, reports correct status.",
+      "expect": "status.started=true, all 3 mount types accessible, read operations return correct data."
+    },
+    {
+      "id": "scenario-2-vfs-namespace",
+      "kind": "test",
+      "description": "Three resource types visible in VFS: host workspace, GitHub snapshot, memory runtime.",
+      "expect": "All mount points exist in status, stat returns correct types and names."
+    },
+    {
+      "id": "scenario-3-catalog-discovery",
+      "kind": "test",
+      "description": "Scan pipeline discovers skills from multiple sources through filter/parser hooks.",
+      "expect": "Non-skill files filtered, skills parsed with correct metadata, multi-source scan works."
+    },
+    {
+      "id": "scenario-4-skill-lifecycle",
+      "kind": "test",
+      "description": "discover → enable → disable → re-discover preserves user state.",
+      "expect": "State transitions correct, upsert preserves state, command handlers return expected data."
+    },
+    {
+      "id": "scenario-5-failure-rollback",
+      "kind": "test",
+      "description": "Startup failure rolls back all plugins; CLI unknown command errors are stable.",
+      "expect": "dispose called, state reset, error message pattern matches."
+    },
+    {
+      "id": "scenario-6-idempotency",
+      "kind": "test",
+      "description": "Double start/stop safe, rescan replaces descriptors idempotently.",
+      "expect": "No side effects from repeated operations, dispose called exactly once."
+    },
+    {
+      "id": "import-boundary-global",
+      "kind": "test",
+      "description": "Three-layer import boundary: sdk/support/plugins closed, catalog isolated, skill-manager isolated.",
+      "expect": "No reverse dependencies detected across all package boundaries."
+    },
+    {
+      "id": "monolithic-stub-zero",
+      "kind": "test",
+      "description": "All previously monolithic packages have multiple modules, stub-only packages have real implementations.",
+      "expect": "daemon >=5 modules, plugin-sdk >=3 modules, mountfs-host has local-fs.ts."
+    }
+  ],
+  "artifacts": [
+    "packages/actant/src/__tests__/e2e-milestone1.test.ts",
+    "packages/actant/src/__tests__/import-boundary.test.ts",
+    "packages/plugin-skill-manager/src/__tests__/skill-manager.test.ts"
+  ]
+}
